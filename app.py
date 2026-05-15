@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 
 # -------------------------------------------------------
-# Настройки страницы
+# Page settings
 # -------------------------------------------------------
 st.set_page_config(
     page_title="Система анализа отзывов",
@@ -20,7 +20,7 @@ st.set_page_config(
 
 
 # -------------------------------------------------------
-# Функция очистки текста
+# Text cleaning function
 # -------------------------------------------------------
 def clean_text(text):
     """
@@ -35,18 +35,15 @@ def clean_text(text):
     text = str(text).lower()
     text = re.sub(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
-
     return text
 
 
 # -------------------------------------------------------
-# Функция определения темы отзыва
+# Topic detection
 # -------------------------------------------------------
 def detect_topic(review):
     """
     Определяет основную тему отзыва по ключевым словам.
-    Категории:
-    сервис, доставка, цена, еда, качество, чистота, общее
     """
     review = clean_text(review)
 
@@ -58,8 +55,8 @@ def detect_topic(review):
         ],
         "Доставка": [
             "доставка", "курьер", "опоздал", "поздно", "быстро",
-            "заказ", "привезли", "доставили", "время доставки",
-            "задержалась", "задержка"
+            "заказ", "привезли", "доставили", "время", "задержка",
+            "задержалась"
         ],
         "Цена": [
             "цена", "дорого", "дешево", "стоимость", "деньги",
@@ -70,13 +67,14 @@ def detect_topic(review):
             "меню", "порция", "напиток", "обед", "ужин"
         ],
         "Качество": [
-            "качество", "свежий", "свежая", "свежее", "плохой",
-            "хороший", "испорченный", "брак", "нормальный",
-            "отличный"
+            "качество", "свежий", "свежая", "свежее",
+            "плохой", "хороший", "испорченный", "брак",
+            "нормальный", "отличный"
         ],
         "Чистота": [
-            "чисто", "грязно", "чистота", "упаковка", "гигиена",
-            "аккуратно", "мусор", "пятна", "грязный"
+            "чисто", "грязно", "чистота", "упаковка",
+            "гигиена", "аккуратно", "мусор", "пятна",
+            "грязный"
         ],
     }
 
@@ -95,7 +93,7 @@ def detect_topic(review):
 
 
 # -------------------------------------------------------
-# Предсказание с нейтральным классом
+# Sentiment prediction with neutral class
 # -------------------------------------------------------
 def predict_with_neutral(model, vectorizer, text, threshold=0.55):
     """
@@ -116,7 +114,7 @@ def predict_with_neutral(model, vectorizer, text, threshold=0.55):
 
 
 # -------------------------------------------------------
-# Датасет по умолчанию
+# Default Russian dataset
 # -------------------------------------------------------
 @st.cache_data
 def load_default_dataset():
@@ -146,7 +144,12 @@ def load_default_dataset():
             "Сервис хороший, но цена немного завышена",
             "Все было нормально, ничего плохого сказать не могу",
             "Заказ пришел вовремя, еда свежая",
-            "Мне не понравилось обслуживание"
+            "Мне не понравилось обслуживание",
+            "Доставка была быстрой и удобной",
+            "Еда была испорченной",
+            "Цена приемлемая, сервис обычный",
+            "Персонал грубый и невнимательный",
+            "Упаковка чистая и аккуратная"
         ],
         "Sentiment": [
             "положительный",
@@ -173,7 +176,12 @@ def load_default_dataset():
             "нейтральный",
             "нейтральный",
             "положительный",
-            "отрицательный"
+            "отрицательный",
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "отрицательный",
+            "положительный"
         ]
     }
 
@@ -181,7 +189,7 @@ def load_default_dataset():
 
 
 # -------------------------------------------------------
-# Обучение модели
+# Model training
 # -------------------------------------------------------
 def train_model(df):
     """
@@ -189,6 +197,23 @@ def train_model(df):
     Используются CountVectorizer и Multinomial Naive Bayes.
     """
     df = df.copy()
+
+    if "Review" not in df.columns or "Sentiment" not in df.columns:
+        df = load_default_dataset()
+
+    df = df[["Review", "Sentiment"]]
+
+    # Remove empty rows and NaN values
+    df = df.dropna(subset=["Review", "Sentiment"])
+    df["Review"] = df["Review"].astype(str)
+    df["Sentiment"] = df["Sentiment"].astype(str)
+
+    df = df[df["Review"].str.strip() != ""]
+    df = df[df["Sentiment"].str.strip() != ""]
+
+    # Use default dataset if uploaded/local CSV is broken
+    if len(df) < 6:
+        df = load_default_dataset()
 
     df["clean_review"] = df["Review"].apply(clean_text)
 
@@ -198,7 +223,6 @@ def train_model(df):
     vectorizer = CountVectorizer()
     X_vectorized = vectorizer.fit_transform(X)
 
-    # Если данных мало, делим осторожно
     try:
         X_train, X_test, y_train, y_test = train_test_split(
             X_vectorized,
@@ -233,7 +257,7 @@ def train_model(df):
 
 
 # -------------------------------------------------------
-# Анализ загруженного CSV-файла
+# CSV analysis
 # -------------------------------------------------------
 def analyze_reviews(df, model, vectorizer):
     """
@@ -246,6 +270,14 @@ def analyze_reviews(df, model, vectorizer):
         st.error("CSV-файл должен содержать колонку с названием 'Review'.")
         return None
 
+    df = df.dropna(subset=["Review"])
+    df["Review"] = df["Review"].astype(str)
+    df = df[df["Review"].str.strip() != ""]
+
+    if df.empty:
+        st.error("CSV-файл не содержит отзывов для анализа.")
+        return None
+
     df["Очищенный текст"] = df["Review"].apply(clean_text)
     df["Предсказанная тональность"] = df["Review"].apply(
         lambda text: predict_with_neutral(model, vectorizer, text)
@@ -256,7 +288,7 @@ def analyze_reviews(df, model, vectorizer):
 
 
 # -------------------------------------------------------
-# Боковое меню
+# Sidebar
 # -------------------------------------------------------
 st.sidebar.title("Review Analytics System")
 st.sidebar.write("AI-система для анализа клиентских отзывов")
@@ -273,7 +305,7 @@ st.sidebar.write("Сервис, доставка, цена, еда, качест
 
 
 # -------------------------------------------------------
-# Заголовок
+# Main title
 # -------------------------------------------------------
 st.title("Система анализа клиентских отзывов")
 
@@ -286,7 +318,7 @@ st.write(
 
 
 # -------------------------------------------------------
-# Загрузка датасета
+# Load training dataset
 # -------------------------------------------------------
 default_df = load_default_dataset()
 
@@ -303,13 +335,13 @@ except Exception:
 
 
 # -------------------------------------------------------
-# Обучение модели
+# Train model
 # -------------------------------------------------------
 model, vectorizer, accuracy, report, matrix = train_model(training_df)
 
 
 # -------------------------------------------------------
-# Вкладки
+# Tabs
 # -------------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
     "Анализ одного отзыва",
@@ -320,7 +352,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 
 # -------------------------------------------------------
-# Вкладка 1: анализ одного отзыва
+# Tab 1: Single review analysis
 # -------------------------------------------------------
 with tab1:
     st.header("Анализ одного отзыва")
@@ -350,7 +382,7 @@ with tab1:
 
 
 # -------------------------------------------------------
-# Вкладка 2: анализ CSV
+# Tab 2: CSV analysis
 # -------------------------------------------------------
 with tab2:
     st.header("Анализ отзывов из CSV-файла")
@@ -418,7 +450,7 @@ with tab2:
 
 
 # -------------------------------------------------------
-# Вкладка 3: оценка модели
+# Tab 3: Model evaluation
 # -------------------------------------------------------
 with tab3:
     st.header("Оценка модели машинного обучения")
@@ -446,12 +478,17 @@ with tab3:
 
 
 # -------------------------------------------------------
-# Вкладка 4: обучающий датасет
+# Tab 4: Training dataset
 # -------------------------------------------------------
 with tab4:
     st.header("Обучающий датасет")
 
     dataset_view = training_df.copy()
+
+    if "Review" not in dataset_view.columns or "Sentiment" not in dataset_view.columns:
+        dataset_view = default_df
+
+    dataset_view = dataset_view.dropna(subset=["Review", "Sentiment"])
     dataset_view["Очищенный текст"] = dataset_view["Review"].apply(clean_text)
     dataset_view["Определенная тема"] = dataset_view["Review"].apply(detect_topic)
 
