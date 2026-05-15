@@ -10,70 +10,73 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 
 # -------------------------------------------------------
-# Page settings
+# Настройки страницы
 # -------------------------------------------------------
 st.set_page_config(
-    page_title="Review Analytics System",
+    page_title="Система анализа отзывов",
     page_icon="📊",
     layout="wide"
 )
 
 
 # -------------------------------------------------------
-# Text preprocessing function
+# Функция очистки текста
 # -------------------------------------------------------
 def clean_text(text):
     """
-    Cleans customer review text:
-    - converts text to lowercase
-    - removes special characters
-    - removes extra spaces
+    Очищает текст отзыва:
+    - переводит текст в нижний регистр
+    - удаляет специальные символы
+    - убирает лишние пробелы
     """
     if pd.isna(text):
         return ""
 
     text = str(text).lower()
-    text = re.sub(r"[^a-zA-Zа-яА-Я0-9\s]", "", text)
+    text = re.sub(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     return text
 
 
 # -------------------------------------------------------
-# Topic detection function
+# Функция определения темы отзыва
 # -------------------------------------------------------
 def detect_topic(review):
     """
-    Detects the main topic of a review using keywords.
-    Categories:
-    service, delivery, price, food, quality, cleanliness, general
+    Определяет основную тему отзыва по ключевым словам.
+    Категории:
+    сервис, доставка, цена, еда, качество, чистота, общее
     """
     review = clean_text(review)
 
     topic_keywords = {
-        "Service": [
-            "service", "staff", "waiter", "manager", "support",
-            "обслуживание", "персонал", "сервис", "официант"
+        "Сервис": [
+            "сервис", "обслуживание", "персонал", "официант",
+            "менеджер", "поддержка", "сотрудник", "вежливый",
+            "грубый", "отношение"
         ],
-        "Delivery": [
-            "delivery", "courier", "late", "arrived", "order",
-            "доставка", "курьер", "опоздал", "заказ"
+        "Доставка": [
+            "доставка", "курьер", "опоздал", "поздно", "быстро",
+            "заказ", "привезли", "доставили", "время доставки",
+            "задержалась", "задержка"
         ],
-        "Price": [
-            "price", "expensive", "cheap", "cost", "money",
-            "цена", "дорого", "дешево", "стоимость"
+        "Цена": [
+            "цена", "дорого", "дешево", "стоимость", "деньги",
+            "переплата", "скидка", "акция", "ценник"
         ],
-        "Food": [
-            "food", "taste", "meal", "dish", "menu",
-            "еда", "вкус", "блюдо", "меню"
+        "Еда": [
+            "еда", "вкус", "вкусно", "невкусно", "блюдо",
+            "меню", "порция", "напиток", "обед", "ужин"
         ],
-        "Quality": [
-            "quality", "fresh", "poor", "good", "bad",
-            "качество", "свежий", "плохой", "хороший"
+        "Качество": [
+            "качество", "свежий", "свежая", "свежее", "плохой",
+            "хороший", "испорченный", "брак", "нормальный",
+            "отличный"
         ],
-        "Cleanliness": [
-            "clean", "dirty", "hygiene", "packaging",
-            "чисто", "грязно", "чистота", "упаковка"
+        "Чистота": [
+            "чисто", "грязно", "чистота", "упаковка", "гигиена",
+            "аккуратно", "мусор", "пятна", "грязный"
         ],
     }
 
@@ -86,19 +89,18 @@ def detect_topic(review):
                 break
 
     if len(detected_topics) == 0:
-        return "General"
+        return "Общее"
 
     return ", ".join(detected_topics)
 
 
 # -------------------------------------------------------
-# Neutral sentiment extension
+# Предсказание с нейтральным классом
 # -------------------------------------------------------
 def predict_with_neutral(model, vectorizer, text, threshold=0.55):
     """
-    Predicts sentiment with neutral class.
-    If the model confidence is lower than threshold,
-    the review is classified as neutral.
+    Определяет тональность отзыва.
+    Если уверенность модели ниже порога, отзыв считается нейтральным.
     """
     cleaned = clean_text(text)
     vectorized = vectorizer.transform([cleaned])
@@ -107,51 +109,71 @@ def predict_with_neutral(model, vectorizer, text, threshold=0.55):
     max_probability = probabilities.max()
 
     if max_probability < threshold:
-        return "neutral"
+        return "нейтральный"
 
     prediction = model.predict(vectorized)[0]
     return prediction
 
 
 # -------------------------------------------------------
-# Load default dataset
+# Датасет по умолчанию
 # -------------------------------------------------------
 @st.cache_data
 def load_default_dataset():
     data = {
         "Review": [
-            "The food was delicious and delivery was fast",
-            "Very bad service and cold food",
-            "The price is normal but delivery was late",
-            "I liked the quality and clean packaging",
-            "The courier was rude and the order was delayed",
-            "The service was okay but nothing special",
-            "Great taste and friendly staff",
-            "The food was too expensive for this quality",
-            "Clean place and good service",
-            "Delivery was acceptable but the food was average",
-            "I am very satisfied with the order",
-            "The product quality was poor and disappointing",
-            "The delivery time was normal",
-            "Excellent service and fresh food",
-            "The order arrived late and incomplete"
+            "Еда была вкусной, а доставка быстрой",
+            "Очень плохой сервис и холодная еда",
+            "Цена нормальная, но доставка немного задержалась",
+            "Мне понравилось качество и чистая упаковка",
+            "Курьер был грубым, заказ привезли поздно",
+            "Обслуживание было обычным, ничего особенного",
+            "Отличный вкус и вежливый персонал",
+            "Еда слишком дорогая для такого качества",
+            "Чистое место и хорошее обслуживание",
+            "Доставка была приемлемой, но еда средняя",
+            "Я очень доволен заказом",
+            "Качество продукта было плохим, я разочарован",
+            "Время доставки было нормальным",
+            "Отличный сервис и свежая еда",
+            "Заказ приехал поздно и был неполным",
+            "Персонал был очень внимательным и доброжелательным",
+            "Упаковка была грязной и неаккуратной",
+            "Цена высокая, но качество хорошее",
+            "Меню достаточно обычное, без особых впечатлений",
+            "Курьер доставил заказ быстро и аккуратно",
+            "Блюдо было холодным и невкусным",
+            "Сервис хороший, но цена немного завышена",
+            "Все было нормально, ничего плохого сказать не могу",
+            "Заказ пришел вовремя, еда свежая",
+            "Мне не понравилось обслуживание"
         ],
         "Sentiment": [
-            "positive",
-            "negative",
-            "neutral",
-            "positive",
-            "negative",
-            "neutral",
-            "positive",
-            "negative",
-            "positive",
-            "neutral",
-            "positive",
-            "negative",
-            "neutral",
-            "positive",
-            "negative"
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "положительный",
+            "отрицательный",
+            "положительный",
+            "нейтральный",
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "положительный",
+            "отрицательный",
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "нейтральный",
+            "положительный",
+            "отрицательный",
+            "нейтральный",
+            "нейтральный",
+            "положительный",
+            "отрицательный"
         ]
     }
 
@@ -159,12 +181,12 @@ def load_default_dataset():
 
 
 # -------------------------------------------------------
-# Train model
+# Обучение модели
 # -------------------------------------------------------
 def train_model(df):
     """
-    Trains a sentiment classification model.
-    The model uses CountVectorizer and Multinomial Naive Bayes.
+    Обучает модель классификации тональности отзывов.
+    Используются CountVectorizer и Multinomial Naive Bayes.
     """
     df = df.copy()
 
@@ -176,14 +198,22 @@ def train_model(df):
     vectorizer = CountVectorizer()
     X_vectorized = vectorizer.fit_transform(X)
 
-    # For small datasets, test_size is kept small
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_vectorized,
-        y,
-        test_size=0.3,
-        random_state=42,
-        stratify=y
-    )
+    # Если данных мало, делим осторожно
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_vectorized,
+            y,
+            test_size=0.3,
+            random_state=42,
+            stratify=y
+        )
+    except ValueError:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_vectorized,
+            y,
+            test_size=0.3,
+            random_state=42
+        )
 
     model = MultinomialNB()
     model.fit(X_train, y_train)
@@ -191,108 +221,118 @@ def train_model(df):
     y_pred = model.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    report = classification_report(
+        y_test,
+        y_pred,
+        output_dict=True,
+        zero_division=0
+    )
     matrix = confusion_matrix(y_test, y_pred, labels=model.classes_)
 
     return model, vectorizer, accuracy, report, matrix
 
 
 # -------------------------------------------------------
-# Analyze uploaded dataset
+# Анализ загруженного CSV-файла
 # -------------------------------------------------------
 def analyze_reviews(df, model, vectorizer):
     """
-    Applies sentiment prediction and topic detection to uploaded reviews.
+    Анализирует отзывы из CSV-файла.
+    Файл должен содержать колонку Review.
     """
     df = df.copy()
 
     if "Review" not in df.columns:
-        st.error("CSV file must contain a column named 'Review'.")
+        st.error("CSV-файл должен содержать колонку с названием 'Review'.")
         return None
 
-    df["clean_review"] = df["Review"].apply(clean_text)
-    df["Predicted Sentiment"] = df["Review"].apply(
+    df["Очищенный текст"] = df["Review"].apply(clean_text)
+    df["Предсказанная тональность"] = df["Review"].apply(
         lambda text: predict_with_neutral(model, vectorizer, text)
     )
-    df["Detected Topic"] = df["Review"].apply(detect_topic)
+    df["Определенная тема"] = df["Review"].apply(detect_topic)
 
     return df
 
 
 # -------------------------------------------------------
-# Sidebar
+# Боковое меню
 # -------------------------------------------------------
-st.sidebar.title("ReviewMind")
-st.sidebar.write("AI-based customer review analysis")
+st.sidebar.title("Review Analytics System")
+st.sidebar.write("AI-система для анализа клиентских отзывов")
 
-st.sidebar.markdown("### Features")
-st.sidebar.write("- Sentiment analysis")
-st.sidebar.write("- Topic detection")
-st.sidebar.write("- CSV upload")
-st.sidebar.write("- Charts and metrics")
-st.sidebar.write("- Download results")
+st.sidebar.markdown("### Возможности")
+st.sidebar.write("- Анализ тональности")
+st.sidebar.write("- Определение темы отзыва")
+st.sidebar.write("- Загрузка CSV-файла")
+st.sidebar.write("- Графики и метрики")
+st.sidebar.write("- Скачивание результатов")
 
-st.sidebar.markdown("### Topics")
-st.sidebar.write("Service, Delivery, Price, Food, Quality, Cleanliness")
+st.sidebar.markdown("### Темы отзывов")
+st.sidebar.write("Сервис, доставка, цена, еда, качество, чистота")
 
 
 # -------------------------------------------------------
-# Main title
+# Заголовок
 # -------------------------------------------------------
-st.title("Review Analytics System")
+st.title("Система анализа клиентских отзывов")
+
 st.write(
-    "This application analyzes customer reviews using basic NLP techniques "
-    "and machine learning. It classifies reviews as positive, negative, or neutral "
-    "and detects the main topic of each review."
+    "Это веб-приложение анализирует клиентские отзывы с использованием "
+    "методов обработки естественного языка и машинного обучения. "
+    "Система определяет тональность отзыва: положительную, отрицательную "
+    "или нейтральную, а также выявляет основную тему отзыва."
 )
 
 
 # -------------------------------------------------------
-# Dataset loading
+# Загрузка датасета
 # -------------------------------------------------------
 default_df = load_default_dataset()
 
 try:
     csv_df = pd.read_csv("reviews.csv")
-    if "Review" in csv_df.columns and "Sentiment" in csv_df.columns:
+
+    if not csv_df.empty and "Review" in csv_df.columns and "Sentiment" in csv_df.columns:
         training_df = csv_df
     else:
         training_df = default_df
-except FileNotFoundError:
+
+except Exception:
     training_df = default_df
 
 
 # -------------------------------------------------------
-# Model training
+# Обучение модели
 # -------------------------------------------------------
 model, vectorizer, accuracy, report, matrix = train_model(training_df)
 
 
 # -------------------------------------------------------
-# Tabs
+# Вкладки
 # -------------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
-    "Single Review Analysis",
-    "CSV Dataset Analysis",
-    "Model Evaluation",
-    "Training Dataset"
+    "Анализ одного отзыва",
+    "Анализ CSV-файла",
+    "Оценка модели",
+    "Обучающий датасет"
 ])
 
 
 # -------------------------------------------------------
-# Tab 1: Single review analysis
+# Вкладка 1: анализ одного отзыва
 # -------------------------------------------------------
 with tab1:
-    st.header("Analyze a Single Review")
+    st.header("Анализ одного отзыва")
 
     user_review = st.text_area(
-        "Enter customer review:",
-        placeholder="Example: The delivery was late but the food was good."
+        "Введите отзыв клиента:",
+        placeholder="Например: Доставка была поздней, но еда оказалась вкусной."
     )
 
-    if st.button("Analyze Review"):
+    if st.button("Проанализировать отзыв"):
         if user_review.strip() == "":
-            st.warning("Please enter a review.")
+            st.warning("Пожалуйста, введите текст отзыва.")
         else:
             sentiment = predict_with_neutral(model, vectorizer, user_review)
             topic = detect_topic(user_review)
@@ -300,77 +340,90 @@ with tab1:
             col1, col2 = st.columns(2)
 
             with col1:
-                st.metric("Predicted Sentiment", sentiment.capitalize())
+                st.metric("Тональность отзыва", sentiment.capitalize())
 
             with col2:
-                st.metric("Detected Topic", topic)
+                st.metric("Определенная тема", topic)
 
-            st.subheader("Cleaned Text")
+            st.subheader("Очищенный текст")
             st.write(clean_text(user_review))
 
 
 # -------------------------------------------------------
-# Tab 2: CSV dataset analysis
+# Вкладка 2: анализ CSV
 # -------------------------------------------------------
 with tab2:
-    st.header("Analyze Reviews from CSV File")
+    st.header("Анализ отзывов из CSV-файла")
 
     uploaded_file = st.file_uploader(
-        "Upload CSV file with a column named 'Review'",
+        "Загрузите CSV-файл с колонкой 'Review'",
         type=["csv"]
     )
 
     if uploaded_file is not None:
-        uploaded_df = pd.read_csv(uploaded_file)
-        analyzed_df = analyze_reviews(uploaded_df, model, vectorizer)
+        try:
+            uploaded_df = pd.read_csv(uploaded_file)
+            analyzed_df = analyze_reviews(uploaded_df, model, vectorizer)
 
-        if analyzed_df is not None:
-            st.subheader("Analysis Results")
-            st.dataframe(analyzed_df)
+            if analyzed_df is not None:
+                st.subheader("Результаты анализа")
+                st.dataframe(analyzed_df)
 
-            st.subheader("Sentiment Distribution")
-            sentiment_counts = analyzed_df["Predicted Sentiment"].value_counts().reset_index()
-            sentiment_counts.columns = ["Sentiment", "Count"]
+                st.subheader("Распределение тональности отзывов")
+                sentiment_counts = (
+                    analyzed_df["Предсказанная тональность"]
+                    .value_counts()
+                    .reset_index()
+                )
+                sentiment_counts.columns = ["Тональность", "Количество"]
 
-            fig_sentiment = px.pie(
-                sentiment_counts,
-                names="Sentiment",
-                values="Count",
-                title="Sentiment Share"
-            )
-            st.plotly_chart(fig_sentiment, use_container_width=True)
+                fig_sentiment = px.pie(
+                    sentiment_counts,
+                    names="Тональность",
+                    values="Количество",
+                    title="Доля отзывов по тональности"
+                )
+                st.plotly_chart(fig_sentiment, use_container_width=True)
 
-            st.subheader("Topic Distribution")
-            topic_counts = analyzed_df["Detected Topic"].value_counts().reset_index()
-            topic_counts.columns = ["Topic", "Count"]
+                st.subheader("Распределение тем отзывов")
+                topic_counts = (
+                    analyzed_df["Определенная тема"]
+                    .value_counts()
+                    .reset_index()
+                )
+                topic_counts.columns = ["Тема", "Количество"]
 
-            fig_topic = px.bar(
-                topic_counts,
-                x="Topic",
-                y="Count",
-                title="Detected Review Topics"
-            )
-            st.plotly_chart(fig_topic, use_container_width=True)
+                fig_topic = px.bar(
+                    topic_counts,
+                    x="Тема",
+                    y="Количество",
+                    title="Основные темы клиентских отзывов"
+                )
+                st.plotly_chart(fig_topic, use_container_width=True)
 
-            csv_result = analyzed_df.to_csv(index=False).encode("utf-8")
+                csv_result = analyzed_df.to_csv(index=False).encode("utf-8-sig")
 
-            st.download_button(
-                label="Download Analysis Results as CSV",
-                data=csv_result,
-                file_name="review_analysis_results.csv",
-                mime="text/csv"
-            )
+                st.download_button(
+                    label="Скачать результаты анализа в CSV",
+                    data=csv_result,
+                    file_name="results_review_analysis.csv",
+                    mime="text/csv"
+                )
+
+        except Exception as e:
+            st.error("Не удалось прочитать CSV-файл. Проверьте структуру файла.")
+            st.write("Ошибка:", e)
     else:
-        st.info("Upload a CSV file to start batch review analysis.")
+        st.info("Загрузите CSV-файл, чтобы начать пакетный анализ отзывов.")
 
 
 # -------------------------------------------------------
-# Tab 3: Model evaluation
+# Вкладка 3: оценка модели
 # -------------------------------------------------------
 with tab3:
-    st.header("Model Evaluation")
+    st.header("Оценка модели машинного обучения")
 
-    st.metric("Model Accuracy", f"{accuracy:.2f}")
+    st.metric("Точность модели", f"{accuracy:.2f}")
 
     st.subheader("Classification Report")
     report_df = pd.DataFrame(report).transpose()
@@ -393,26 +446,26 @@ with tab3:
 
 
 # -------------------------------------------------------
-# Tab 4: Training dataset
+# Вкладка 4: обучающий датасет
 # -------------------------------------------------------
 with tab4:
-    st.header("Training Dataset")
+    st.header("Обучающий датасет")
 
     dataset_view = training_df.copy()
-    dataset_view["clean_review"] = dataset_view["Review"].apply(clean_text)
-    dataset_view["Detected Topic"] = dataset_view["Review"].apply(detect_topic)
+    dataset_view["Очищенный текст"] = dataset_view["Review"].apply(clean_text)
+    dataset_view["Определенная тема"] = dataset_view["Review"].apply(detect_topic)
 
     st.dataframe(dataset_view)
 
-    st.subheader("Dataset Summary")
+    st.subheader("Краткая информация о датасете")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("Total Reviews", len(dataset_view))
+        st.metric("Всего отзывов", len(dataset_view))
 
     with col2:
-        st.metric("Sentiment Classes", dataset_view["Sentiment"].nunique())
+        st.metric("Классы тональности", dataset_view["Sentiment"].nunique())
 
     with col3:
-        st.metric("Detected Topics", dataset_view["Detected Topic"].nunique())
+        st.metric("Количество тем", dataset_view["Определенная тема"].nunique())
